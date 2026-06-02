@@ -1,22 +1,20 @@
 import os
 import torch
 import torch.nn as nn
+
 from torch.utils.data import Dataset, DataLoader
 from rich.console import Console
 from rich.progress import track
 
-from datasets.digit_dataset import load_digit_image_paths, read_digit_image
+from datasets.face_dataset import load_face_image_paths, read_face_image
 from utils.split_dataset import split_dataset
 from utils.metrics import evaluate_model
 from utils.seed import set_seed
-from deep_learning.cnn_model import DigitCNN
+from deep_learning.face_cnn_model import FaceCNN
 
 
-console = Console()
-
-
-class DigitImageDataset(Dataset):
-    def __init__(self, image_paths, labels, img_size=28):
+class FaceImageDataset(Dataset):
+    def __init__(self, image_paths, labels, img_size=96):
         self.image_paths = image_paths
         self.labels = labels
         self.img_size = img_size
@@ -25,7 +23,7 @@ class DigitImageDataset(Dataset):
         return len(self.image_paths)
 
     def __getitem__(self, idx):
-        image = read_digit_image(
+        image = read_face_image(
             self.image_paths[idx],
             img_size=self.img_size
         )
@@ -75,7 +73,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, epoch):
     return avg_loss, accuracy
 
 
-def evaluate_cnn(model, dataloader, device):
+def evaluate_cnn(model, dataloader, device, description="Evaluating"):
     model.eval()
 
     y_true = []
@@ -84,7 +82,7 @@ def evaluate_cnn(model, dataloader, device):
     with torch.no_grad():
         for images, labels in track(
             dataloader,
-            description="Evaluating"
+            description=description
         ):
             images = images.to(device)
 
@@ -97,12 +95,16 @@ def evaluate_cnn(model, dataloader, device):
     return y_true, y_pred
 
 
-def run_deep_learning_digit(args):
+def run_deep_learning_face(args, console):
     set_seed(args.seed)
 
-    console.rule("[bold cyan]Digit Recognition: Deep Learning[/bold cyan]")
+    console.rule("[bold cyan]Face Recognition: Deep Learning[/bold cyan]")
 
-    image_paths, labels = load_digit_image_paths(args.data_dir)
+    image_paths, labels, class_to_idx, idx_to_class = load_face_image_paths(
+        args.data_dir
+    )
+
+    num_classes = len(class_to_idx)
 
     splits = split_dataset(
         image_paths=image_paths,
@@ -117,24 +119,25 @@ def run_deep_learning_digit(args):
     val_paths, val_labels = splits["val"]
     test_paths, test_labels = splits["test"]
 
+    console.print(f"Class count:   {num_classes}")
     console.print(f"Total samples: {len(image_paths)}")
     console.print(f"Train samples: {len(train_paths)}")
     console.print(f"Val samples:   {len(val_paths)}")
     console.print(f"Test samples:  {len(test_paths)}")
 
-    train_dataset = DigitImageDataset(
+    train_dataset = FaceImageDataset(
         train_paths,
         train_labels,
         img_size=args.img_size
     )
 
-    val_dataset = DigitImageDataset(
+    val_dataset = FaceImageDataset(
         val_paths,
         val_labels,
         img_size=args.img_size
     )
 
-    test_dataset = DigitImageDataset(
+    test_dataset = FaceImageDataset(
         test_paths,
         test_labels,
         img_size=args.img_size
@@ -164,7 +167,9 @@ def run_deep_learning_digit(args):
 
     console.print(f"\nUsing device: [bold green]{device}[/bold green]")
 
-    model = DigitCNN(num_classes=10).to(device)
+    model = FaceCNN(
+        num_classes=num_classes
+    ).to(device)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -175,7 +180,7 @@ def run_deep_learning_digit(args):
     )
 
     best_val_acc = 0.0
-    best_model_path = "outputs/models/digit_cnn_best.pth"
+    best_model_path = "outputs/models/face_cnn_best.pth"
 
     os.makedirs("outputs/models", exist_ok=True)
 
@@ -192,13 +197,13 @@ def run_deep_learning_digit(args):
         val_true, val_pred = evaluate_cnn(
             model=model,
             dataloader=val_loader,
-            device=device
+            device=device,
+            description=f"Epoch {epoch} Validation"
         )
 
         val_correct = sum(
             int(t == p) for t, p in zip(val_true, val_pred)
         )
-
         val_acc = val_correct / len(val_true)
 
         console.print(
@@ -226,18 +231,24 @@ def run_deep_learning_digit(args):
         torch.load(best_model_path, map_location=device)
     )
 
-    class_names = [str(i) for i in range(10)]
+    # 建議人臉 confusion matrix 用數字 label，圖會比較乾淨
+    class_names = [
+        str(i)
+        for i in range(num_classes)
+    ]
 
     val_true, val_pred = evaluate_cnn(
         model=model,
         dataloader=val_loader,
-        device=device
+        device=device,
+        description="Final Validation"
     )
 
     test_true, test_pred = evaluate_cnn(
         model=model,
         dataloader=test_loader,
-        device=device
+        device=device,
+        description="Final Test"
     )
 
     val_acc, val_report, val_cm = evaluate_model(
@@ -245,7 +256,7 @@ def run_deep_learning_digit(args):
         y_pred=val_pred,
         class_names=class_names,
         output_dir="outputs/reports",
-        prefix="digit_dl_val"
+        prefix=f"face_dl_val_{args.epochs}epochs"
     )
 
     test_acc, test_report, test_cm = evaluate_model(
@@ -253,7 +264,7 @@ def run_deep_learning_digit(args):
         y_pred=test_pred,
         class_names=class_names,
         output_dir="outputs/reports",
-        prefix="digit_dl_test"
+        prefix=f"face_dl_test_{args.epochs}epochs"
     )
 
     console.print(f"Best Validation Accuracy: {best_val_acc:.4f}")

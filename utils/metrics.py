@@ -38,10 +38,24 @@ def evaluate_model(y_true, y_pred, class_names, output_dir, prefix):
         display_labels=class_names
     )
 
-    display.plot(values_format="d")
+    fig, ax = plt.subplots(figsize=(16, 16))
+
+    display.plot(
+        ax=ax,
+        cmap="Blues",
+        values_format="",
+        xticks_rotation=90,
+        colorbar=True
+    )
+
+    # 類別太多時，不顯示每格數字
+    if len(class_names) > 20:
+        for text in display.text_.ravel():
+            text.set_visible(False)
+
     plt.title(f"{prefix} Confusion Matrix")
     plt.tight_layout()
-    plt.savefig(cm_path)
+    plt.savefig(cm_path, dpi=300)
     plt.close()
 
     return accuracy, report_path, cm_path

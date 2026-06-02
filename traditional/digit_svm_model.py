@@ -32,7 +32,7 @@ def run_traditional_digit(args, console):
     val_paths, val_labels = splits["val"]
     test_paths, test_labels = splits["test"]
     
-    print(train_labels[:20])
+    # print(train_labels[:20])
 
     print(f"Total samples: {len(image_paths)}")
     print(f"Train samples: {len(train_paths)}")
@@ -47,27 +47,27 @@ def run_traditional_digit(args, console):
         train_paths,
         img_size=args.img_size,
         desc="Train Features",
-        cache_file="outputs/features/train_hog.npy"
+        cache_file="outputs/features/digit/train_hog.npy"
     )
 
     X_val = build_hog_features(
         val_paths,
         img_size=args.img_size,
         desc="Validation Features",
-        cache_file="outputs/features/val_hog.npy"
+        cache_file="outputs/features/digit/val_hog.npy"
     )
 
     X_test = build_hog_features(
         test_paths,
         img_size=args.img_size,
         desc="Test Features",
-        cache_file="outputs/features/test_hog.npy"
+        cache_file="outputs/features/digit/test_hog.npy"
     )
 
-    print(X_train.shape)
-    print(X_train[0][:20])
-    print(X_train.min())
-    print(X_train.max())
+    # print(X_train.shape)
+    # print(X_train[0][:20])
+    # print(X_train.min())
+    # print(X_train.max())
 
     console.print(
         "\n[bold cyan]Training Linear SVM[/bold cyan]"
@@ -84,7 +84,7 @@ def run_traditional_digit(args, console):
 
     model.fit(X_train, train_labels)
 
-    print(model.classes_)
+    # print(model.classes_)
 
     val_pred = model.predict(X_val)
     test_pred = model.predict(X_test)
